@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: { sku: string } })
     });
 
     // Retornar la imagen con los headers correctos
-    return new NextResponse(qrBuffer, {
+    return new NextResponse(qrBuffer as any, {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=86400, s-maxage=86400"
