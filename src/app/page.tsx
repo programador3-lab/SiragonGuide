@@ -3,6 +3,7 @@ import DynamicBackground from "@/components/DynamicBackground";
 import ProductSearch from "@/components/ProductSearch";
 import MediaGallery from "@/components/MediaGallery";
 import prisma from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 const productsMenu = [
   { label: "Store", href: "https://siragon.com/productos" },
@@ -53,16 +54,9 @@ const getQueryValue = (
 export default async function Home({ searchParams }: PageProps) {
   const searchTerm = getQueryValue(searchParams, "sku", "producto", "product", "nombre", "name");
 
-  let product = null;
   if (searchTerm) {
-    product = await prisma.productGuide.findFirst({
-      where: {
-        OR: [
-          { sku: searchTerm },
-          { productName: searchTerm }
-        ]
-      }
-    });
+    // Redirigir automáticamente a la nueva página dedicada
+    redirect(`/guia/${encodeURIComponent(searchTerm)}`);
   }
 
   const navBar = (
@@ -111,66 +105,19 @@ export default async function Home({ searchParams }: PageProps) {
     </nav>
   );
 
-  if (!product) {
-    return (
-      <main className="relative min-h-screen text-white font-sans selection:bg-siragon-orange selection:text-white overflow-hidden">
-        <DynamicBackground />
-        {navBar}
-        <section className="relative max-w-7xl mx-auto px-8 py-24 flex flex-col items-center min-h-[calc(100vh-45px)]">
-          <ProductSearch />
-          
-          {searchTerm && (
-            <div className="mt-8 px-6 py-4 bg-red-500/10 border border-red-500/20 text-red-200 rounded-2xl text-center max-w-2xl">
-              No encontramos guías para <strong>"{searchTerm}"</strong>. Por favor verifica el modelo o usa el buscador.
-            </div>
-          )}
-        </section>
-      </main>
-    );
-  }
-
-  // Product found
-  type MediaItem = {
-    name: string;
-    type: "image" | "video";
-    url?: string;
-    base64?: string;
-  };
-
-  const productPhoto = product.productPhoto as any;
-  const guideMedia = (product.guideMedia as unknown as MediaItem[]) || [];
-  const tipsMedia = (product.tipsMedia as unknown as MediaItem[]) || [];
-  const mainImage = productPhoto?.url || productPhoto?.base64 || "https://siragon.com/wp-content/uploads/2023/03/Logo-Siragon_Blanco-e1684488951400.png";
-
   return (
-    <main className="relative min-h-screen text-white font-sans selection:bg-siragon-orange selection:text-white">
+    <main className="relative min-h-screen text-white font-sans selection:bg-siragon-orange selection:text-white overflow-hidden">
       <DynamicBackground />
       {navBar}
-
-      <div className="relative max-w-7xl mx-auto px-8 pt-12 pb-24 z-10">
+      <section className="relative max-w-7xl mx-auto px-8 py-24 flex flex-col items-center min-h-[calc(100vh-45px)]">
+        <ProductSearch />
         
-        {/* Product Header */}
-        <div className="flex flex-col md:flex-row items-center gap-10 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 mb-16 shadow-2xl shadow-siragon-orange/5">
-          <div className="w-full md:w-1/3 aspect-square rounded-3xl overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center p-6">
-            <img src={mainImage} alt={product.productName} className="w-full h-full object-contain drop-shadow-2xl" />
+        {searchTerm && (
+          <div className="mt-8 px-6 py-4 bg-red-500/10 border border-red-500/20 text-red-200 rounded-2xl text-center max-w-2xl">
+            No encontramos guías para <strong>"{searchTerm}"</strong>. Por favor verifica el modelo o usa el buscador.
           </div>
-          <div className="flex-1 space-y-6">
-            <div>
-              <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-                {product.productName}
-              </h1>
-            </div>
-            <p className="text-white/60 text-lg max-w-2xl">
-              Aquí encontrarás todas las guías de instalación, configuraciones iniciales y tips para sacarle el máximo provecho a tu equipo.
-            </p>
-          </div>
-        </div>
-
-        {/* Media Galleries */}
-        <MediaGallery items={guideMedia} title="Guías de Instalación" />
-        <MediaGallery items={tipsMedia} title="Tips Adicionales" />
-
-      </div>
+        )}
+      </section>
     </main>
   );
 }

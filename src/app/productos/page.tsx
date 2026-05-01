@@ -433,7 +433,7 @@ export default function ProductosPage() {
                         <div className="bg-white p-3 rounded-2xl border border-black/10 shadow-sm flex flex-col items-center gap-2">
                           <QRCodeCanvas 
                             id="qr-canvas"
-                            value={`${(process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, "")}/?sku=${encodeURIComponent(selectedProduct.sku)}`} 
+                            value={`${(process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, "")}/guia/${encodeURIComponent(selectedProduct.sku)}`} 
                             size={120} 
                             level="H"
                             includeMargin={true}
