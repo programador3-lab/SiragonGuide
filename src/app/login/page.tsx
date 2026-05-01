@@ -48,8 +48,7 @@ export default function Login() {
             </a>
           </div>
 
-          <div className="flex items-center gap-4">
-          </div>
+          <div className="flex items-center gap-4">          </div>
         </div>
       </nav>
 

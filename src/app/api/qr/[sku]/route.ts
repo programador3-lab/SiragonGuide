@@ -10,8 +10,9 @@ export async function GET(req: Request, { params }: { params: { sku: string } })
 
   try {
     // Construir la URL completa para la guía del producto
-    const origin = new URL(req.url).origin;
-    const productUrl = `${origin}/?sku=${encodeURIComponent(sku)}`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+    const cleanBaseUrl = baseUrl.replace(/\/$/, "");
+    const productUrl = `${cleanBaseUrl}/?sku=${encodeURIComponent(sku)}`;
 
     // Generar el código QR como buffer de imagen PNG
     const qrBuffer = await QRCode.toBuffer(productUrl, {
