@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: { params: { sku: string } })
     const productUrl = `${origin}/?sku=${encodeURIComponent(sku)}`;
 
     // Generar el código QR como buffer de imagen PNG
-    const qrBuffer = await QRCode.toBuffer(productUrl, {
+    const qrBuffer:any = await QRCode.toBuffer(productUrl, {
       type: "png",
       margin: 1,
       width: 600,
