@@ -15,30 +15,37 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email
+            }
+          });
+
+          if (!user) {
+            console.log("Usuario no encontrado:", credentials.email);
+            return null;
           }
-        });
 
-        if (!user) {
-          return null;
+          // En producción, usa bcrypt para comparar contraseñas
+          // const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          const isPasswordValid = credentials.password === user.password;
+
+          if (!isPasswordValid) {
+            console.log("Contraseña incorrecta para:", credentials.email);
+            return null;
+          }
+
+          return {
+            id: user.id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error("ERROR EN BASE DE DATOS DURANTE LOGIN:", error);
+          throw new Error("Error de conexión con la base de datos");
         }
-
-        // En producción, usa bcrypt para comparar contraseñas
-        // const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-        const isPasswordValid = credentials.password === user.password;
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id.toString(),
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       }
     })
   ],
