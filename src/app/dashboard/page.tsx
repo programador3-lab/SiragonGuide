@@ -11,16 +11,16 @@ type MediaPreview = {
   name: string;
   type: "image" | "video";
   previewUrl: string;
-  base64?: string;
+  file?: File;
 };
 
 type LocalProductMediaEntry = {
   id: string;
   productName: string;
   sku: string;
-  productPhoto: { name: string; type: "image" | "video"; base64?: string } | null;
-  guideMedia: { name: string; type: "image" | "video"; base64?: string }[];
-  tipsMedia: { name: string; type: "image" | "video"; base64?: string }[];
+  productPhoto: { name: string; type: "image" | "video"; url?: string } | null;
+  guideMedia: { name: string; type: "image" | "video"; url?: string }[];
+  tipsMedia: { name: string; type: "image" | "video"; url?: string }[];
   createdAt: string;
 };
 
@@ -43,8 +43,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
+    } else if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/");
     }
-  }, [status, router]);
+  }, [status, router, session]);
 
   useEffect(() => {
     return () => {
@@ -59,17 +61,12 @@ export default function DashboardPage() {
     );
     const results: MediaPreview[] = [];
     for (const file of validFiles) {
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
       results.push({
         id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         name: file.name,
         type: file.type.startsWith("video/") ? "video" : "image",
         previewUrl: URL.createObjectURL(file),
-        base64,
+        file: file,
       });
     }
     return results;
@@ -141,30 +138,73 @@ export default function DashboardPage() {
       return;
     }
 
-    const newEntry: LocalProductMediaEntry = {
-      id: `${Date.now()}`,
-      productName: form.productName.trim(),
-      sku: form.sku.trim(),
-      productPhoto: productPhoto
-        ? { name: productPhoto.name, type: productPhoto.type, base64: productPhoto.base64 }
-        : null,
-      guideMedia: guideMedia.map((item) => ({ name: item.name, type: item.type, base64: item.base64 })),
-      tipsMedia: tipsMedia.map((item) => ({ name: item.name, type: item.type, base64: item.base64 })),
-      createdAt: new Date().toISOString(),
+    const uploadFile = async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData?.message || "Error al subir archivo: " + file.name);
+      }
+      const data = await res.json();
+      return data.url;
     };
 
-    const raw = localStorage.getItem("localProductGuides");
-    const current = raw ? (JSON.parse(raw) as LocalProductMediaEntry[]) : [];
-    localStorage.setItem("localProductGuides", JSON.stringify([newEntry, ...current]));
-    setForm(initialForm);
-    if (productPhoto) URL.revokeObjectURL(productPhoto.previewUrl);
-    setProductPhoto(null);
-    guideMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-    tipsMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-    setGuideMedia([]);
-    setTipsMedia([]);
-    setLoading(false);
-    setMessage("Producto guardado.");
+    try {
+      let finalProductPhoto = null;
+      if (productPhoto?.file) {
+        const url = await uploadFile(productPhoto.file);
+        finalProductPhoto = { name: productPhoto.name, type: productPhoto.type, url };
+      }
+
+      const finalGuideMedia = [];
+      for (const item of guideMedia) {
+        if (item.file) {
+          const url = await uploadFile(item.file);
+          finalGuideMedia.push({ name: item.name, type: item.type, url });
+        }
+      }
+
+      const finalTipsMedia = [];
+      for (const item of tipsMedia) {
+        if (item.file) {
+          const url = await uploadFile(item.file);
+          finalTipsMedia.push({ name: item.name, type: item.type, url });
+        }
+      }
+
+      const newEntry = {
+        productName: form.productName.trim(),
+        sku: form.sku.trim(),
+        productPhoto: finalProductPhoto,
+        guideMedia: finalGuideMedia,
+        tipsMedia: finalTipsMedia,
+      };
+
+      const res = await fetch("/api/guides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newEntry),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Error al guardar el producto");
+      }
+
+      setForm(initialForm);
+      if (productPhoto) URL.revokeObjectURL(productPhoto.previewUrl);
+      setProductPhoto(null);
+      guideMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      tipsMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      setGuideMedia([]);
+      setTipsMedia([]);
+      setMessage("Producto guardado exitosamente en la base de datos.");
+    } catch (err: any) {
+      setError(err.message || "Ocurrió un error al guardar");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (status === "loading") {

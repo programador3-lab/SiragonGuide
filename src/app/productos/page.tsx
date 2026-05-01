@@ -4,20 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Package, FileText, Lightbulb, Calendar, Search, Box, LayoutGrid, X, Trash2, Edit3, Save, Image as ImageIcon, Video, Upload } from "lucide-react";
+import { ArrowLeft, Package, FileText, Lightbulb, Calendar, Search, Box, LayoutGrid, X, Trash2, Edit3, Save, Image as ImageIcon, Video, Upload, Download, Link as LinkIcon, ExternalLink } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 type LocalProductMediaEntry = {
   id: string;
   productName: string;
   sku: string;
-  productPhoto: { name: string; type: "image" | "video"; base64?: string } | null;
-  guideMedia: { name: string; type: "image" | "video"; base64?: string }[];
-  tipsMedia: { name: string; type: "image" | "video"; base64?: string }[];
+  productPhoto: { name: string; type: "image" | "video"; base64?: string; url?: string; file?: File } | null;
+  guideMedia: { name: string; type: "image" | "video"; base64?: string; url?: string; file?: File }[];
+  tipsMedia: { name: string; type: "image" | "video"; base64?: string; url?: string; file?: File }[];
   createdAt: string;
 };
 
 export default function ProductosPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<LocalProductMediaEntry[]>([]);
   const [ready, setReady] = useState(false);
@@ -25,7 +26,22 @@ export default function ProductosPage() {
   const [selectedProduct, setSelectedProduct] = useState<LocalProductMediaEntry | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<LocalProductMediaEntry | null>(null);
-  const [previewMedia, setPreviewMedia] = useState<{ name: string; type: "image" | "video"; base64?: string } | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<{ name: string; type: "image" | "video"; base64?: string; url?: string } | null>(null);
+
+  const downloadQR = (sku: string) => {
+    const canvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
+    if (canvas) {
+      const pngUrl = canvas
+        .toDataURL("image/png")
+        .replace("image/png", "image/octet-stream");
+      const downloadLink = document.createElement("a");
+      downloadLink.href = pngUrl;
+      downloadLink.download = `QR_Siragon_${sku}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+  };
 
   useEffect(() => {
     if (status === "loading") return;
@@ -35,37 +51,126 @@ export default function ProductosPage() {
       return;
     }
 
-    const raw = localStorage.getItem("localProductGuides");
-    const localItems = raw ? JSON.parse(raw) : [];
-    const mapped = Array.isArray(localItems) ? localItems.map(item => ({
-      ...item,
-      id: String(item.id ?? crypto.randomUUID()),
-      productName: String(item.productName ?? "-"),
-      sku: String(item.sku ?? "-"),
-      guideMedia: Array.isArray(item.guideMedia) ? item.guideMedia : [],
-      tipsMedia: Array.isArray(item.tipsMedia) ? item.tipsMedia : [],
-      productPhoto: item.productPhoto || null,
-      createdAt: String(item.createdAt ?? new Date().toISOString()),
-    })) : [];
-    setItems(mapped);
-    setReady(true);
+    // @ts-ignore
+    if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/");
+      return;
+    }
+
+    const fetchGuides = async () => {
+      try {
+        const res = await fetch("/api/guides");
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = data.map((item: any) => ({
+            ...item,
+            id: String(item.id),
+            productName: item.productName || "-",
+            sku: item.sku || "-",
+            guideMedia: Array.isArray(item.guideMedia) ? item.guideMedia : [],
+            tipsMedia: Array.isArray(item.tipsMedia) ? item.tipsMedia : [],
+            productPhoto: item.productPhoto || null,
+            createdAt: String(item.createdAt || new Date().toISOString()),
+          }));
+          setItems(mapped);
+        }
+      } catch (err) {
+        console.error("Error al cargar productos", err);
+      } finally {
+        setReady(true);
+      }
+    };
+
+    fetchGuides();
   }, [status, router]);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.")) return;
-    const updated = items.filter(item => item.id !== id);
-    setItems(updated);
-    localStorage.setItem("localProductGuides", JSON.stringify(updated));
-    setSelectedProduct(null);
+    try {
+      const res = await fetch(`/api/guides/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        const updated = items.filter(item => item.id !== id);
+        setItems(updated);
+        setSelectedProduct(null);
+      } else {
+        alert("Error al eliminar");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editForm) return;
-    const updated = items.map(item => item.id === editForm.id ? editForm : item);
-    setItems(updated);
-    localStorage.setItem("localProductGuides", JSON.stringify(updated));
-    setSelectedProduct(editForm);
-    setIsEditing(false);
+
+    const uploadFile = async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Error al subir archivo");
+      }
+      const data = await res.json();
+      return data.url;
+    };
+
+    try {
+      const finalForm = { ...editForm, guideMedia: [...editForm.guideMedia], tipsMedia: [...editForm.tipsMedia] };
+
+      if (finalForm.productPhoto?.file) {
+        finalForm.productPhoto = { ...finalForm.productPhoto, url: await uploadFile(finalForm.productPhoto.file) };
+        delete finalForm.productPhoto.file;
+        delete finalForm.productPhoto.base64;
+      }
+      for (let i = 0; i < finalForm.guideMedia.length; i++) {
+        if (finalForm.guideMedia[i].file) {
+          finalForm.guideMedia[i] = { ...finalForm.guideMedia[i], url: await uploadFile(finalForm.guideMedia[i].file as File) };
+          delete finalForm.guideMedia[i].file;
+          delete finalForm.guideMedia[i].base64;
+        }
+      }
+      for (let i = 0; i < finalForm.tipsMedia.length; i++) {
+        if (finalForm.tipsMedia[i].file) {
+          finalForm.tipsMedia[i] = { ...finalForm.tipsMedia[i], url: await uploadFile(finalForm.tipsMedia[i].file as File) };
+          delete finalForm.tipsMedia[i].file;
+          delete finalForm.tipsMedia[i].base64;
+        }
+      }
+
+      const res = await fetch(`/api/guides/${editForm.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(finalForm)
+      });
+      if (res.ok) {
+        const updatedItem = await res.json();
+        const mappedItem = {
+          ...updatedItem,
+          id: String(updatedItem.id),
+          productName: updatedItem.productName || "-",
+          sku: updatedItem.sku || "-",
+          guideMedia: Array.isArray(updatedItem.guideMedia) ? updatedItem.guideMedia : [],
+          tipsMedia: Array.isArray(updatedItem.tipsMedia) ? updatedItem.tipsMedia : [],
+          productPhoto: updatedItem.productPhoto || null,
+          createdAt: String(updatedItem.createdAt || new Date().toISOString()),
+        };
+        const updated = items.map(item => item.id === editForm.id ? mappedItem : item);
+        setItems(updated);
+        setSelectedProduct(mappedItem);
+        setIsEditing(false);
+      } else {
+        let errMsg = "Error al guardar";
+        try {
+          const errData = await res.json();
+          if (errData?.message) errMsg = errData.message;
+        } catch (e) { }
+        alert(errMsg);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar: " + String(err));
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: "guide" | "tips") => {
@@ -73,18 +178,14 @@ export default function ProductosPage() {
     if (!files?.length || !editForm) return;
 
     const validFiles = Array.from(files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    const newMedia: { name: string; type: "image" | "video"; base64?: string }[] = [];
+    const newMedia: { name: string; type: "image" | "video"; base64?: string; file?: File }[] = [];
 
     for (const file of validFiles) {
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
       newMedia.push({
         name: file.name,
         type: file.type.startsWith("video/") ? "video" : "image",
-        base64,
+        base64: URL.createObjectURL(file), // temporary for preview
+        file,
       });
     }
 
@@ -102,18 +203,13 @@ export default function ProductosPage() {
 
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) return;
 
-    const base64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-
     setEditForm({
       ...editForm,
       productPhoto: {
         name: file.name,
         type: file.type.startsWith("video/") ? "video" : "image",
-        base64,
+        base64: URL.createObjectURL(file), // temporary for preview
+        file,
       }
     });
     e.target.value = "";
@@ -227,8 +323,8 @@ export default function ProductosPage() {
 
                 <div className="relative z-10 flex-grow">
                   <div className="mb-6 flex h-40 items-center justify-center rounded-2xl bg-black/5 border border-black/5 relative overflow-hidden group-hover:bg-siragon-orange/5 transition-colors">
-                    {row.productPhoto?.base64 ? (
-                      <img src={row.productPhoto.base64} alt={row.productName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    {row.productPhoto?.url || row.productPhoto?.base64 ? (
+                      <img src={row.productPhoto.url || row.productPhoto.base64} alt={row.productName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <Package size={48} className="text-black/20 group-hover:text-siragon-orange transition-colors duration-500 group-hover:scale-110 transform" />
                     )}
@@ -321,16 +417,51 @@ export default function ProductosPage() {
                 <div className="space-y-8">
                   <div className="flex flex-col md:flex-row gap-6">
                     <div className="w-full md:w-1/3 bg-black/5 rounded-2xl flex items-center justify-center border border-black/5 overflow-hidden">
-                      {selectedProduct.productPhoto?.base64 ? (
-                        <img src={selectedProduct.productPhoto.base64} alt={selectedProduct.productName} className="w-full object-cover" />
+                      {selectedProduct.productPhoto?.url || selectedProduct.productPhoto?.base64 ? (
+                        <img src={selectedProduct.productPhoto.url || selectedProduct.productPhoto.base64} alt={selectedProduct.productName} className="w-full object-cover" />
                       ) : (
                         <Package size={64} className="text-black/20 m-12" />
                       )}
                     </div>
-                    <div className="w-full md:w-2/3 flex flex-col justify-center">
-                      <span className="inline-block px-3 py-1 bg-siragon-orange/10 text-siragon-orange text-[10px] font-bold uppercase tracking-widest rounded-lg w-fit mb-4">{selectedProduct.sku}</span>
-                      <h2 className="text-4xl font-light text-black mb-2">{selectedProduct.productName}</h2>
-                      <p className="text-sm text-black/50">Registrado el {new Date(selectedProduct.createdAt).toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <div className="w-full md:w-2/3 flex items-center justify-between gap-4">
+                      <div className="flex flex-col justify-center">
+                        <span className="inline-block px-3 py-1 bg-siragon-orange/10 text-siragon-orange text-[10px] font-bold uppercase tracking-widest rounded-lg w-fit mb-4">{selectedProduct.sku}</span>
+                        <h2 className="text-4xl font-light text-black mb-2">{selectedProduct.productName}</h2>
+                        <p className="text-sm text-black/50">Registrado el {new Date(selectedProduct.createdAt).toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      </div>
+                      <div className="flex-shrink-0 flex flex-col items-center gap-3">
+                        <div className="bg-white p-3 rounded-2xl border border-black/10 shadow-sm flex flex-col items-center gap-2">
+                          <QRCodeCanvas 
+                            id="qr-canvas"
+                            value={`${window.location.origin}/?sku=${encodeURIComponent(selectedProduct.sku)}`} 
+                            size={120} 
+                            level="H"
+                            includeMargin={true}
+                          />
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-black/40">Escanear Guía</span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2 w-full">
+                          <button 
+                            onClick={() => downloadQR(selectedProduct.sku)}
+                            className="text-[10px] bg-siragon-orange text-white px-4 py-2.5 rounded-xl font-bold hover:bg-siragon-orange/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-siragon-orange/20"
+                          >
+                            <Download size={14} /> Descargar PNG
+                          </button>
+                          
+                          <button 
+                            onClick={() => {
+                              const imageUrl = `${window.location.origin}/api/qr/${encodeURIComponent(selectedProduct.sku)}`;
+                              navigator.clipboard.writeText(imageUrl);
+                              alert("URL de imagen copiada. Úsala en la web de Síragon.");
+                            }}
+                            className="text-[10px] bg-white text-black/60 px-4 py-2.5 rounded-xl font-bold hover:bg-black/5 transition-all w-full flex items-center justify-center gap-2 border border-black/10"
+                            title="Copiar URL para usar en otros sitios"
+                          >
+                            <LinkIcon size={14} /> Copiar URL Imagen
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -340,12 +471,12 @@ export default function ProductosPage() {
                       {selectedProduct.guideMedia.length === 0 ? <p className="text-xs text-black/40">No hay guías registradas.</p> : (
                         <div className="grid grid-cols-2 gap-3">
                           {selectedProduct.guideMedia.map((media, i) => (
-                            <div key={i} onClick={() => media.base64 && setPreviewMedia(media)} className="border border-black/10 rounded-xl overflow-hidden bg-black/5 cursor-pointer hover:border-siragon-orange transition-all group relative">
+                            <div key={i} onClick={() => (media.base64 || media.url) && setPreviewMedia(media)} className="border border-black/10 rounded-xl overflow-hidden bg-black/5 cursor-pointer hover:border-siragon-orange transition-all group relative">
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 flex items-center justify-center">
-                                {media.base64 && <Search className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />}
+                                {(media.base64 || media.url) && <Search className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />}
                               </div>
-                              {media.base64 ? (
-                                media.type === "image" ? <img src={media.base64} alt={media.name} className="w-full h-24 object-cover" /> : <video src={media.base64} className="w-full h-24 object-cover" />
+                              {media.base64 || media.url ? (
+                                media.type === "image" ? <img src={media.url || media.base64} alt={media.name} className="w-full h-24 object-cover" /> : <video src={media.url || media.base64} className="w-full h-24 object-cover" />
                               ) : (
                                 <div className="w-full h-24 flex items-center justify-center bg-black/5 text-black/20">{media.type === "image" ? <ImageIcon size={24} /> : <Video size={24} />}</div>
                               )}
@@ -361,12 +492,12 @@ export default function ProductosPage() {
                       {selectedProduct.tipsMedia.length === 0 ? <p className="text-xs text-black/40">No hay tips registrados.</p> : (
                         <div className="grid grid-cols-2 gap-3">
                           {selectedProduct.tipsMedia.map((media, i) => (
-                            <div key={i} onClick={() => media.base64 && setPreviewMedia(media)} className="border border-black/10 rounded-xl overflow-hidden bg-black/5 cursor-pointer hover:border-siragon-orange transition-all group relative">
+                            <div key={i} onClick={() => (media.base64 || media.url) && setPreviewMedia(media)} className="border border-black/10 rounded-xl overflow-hidden bg-black/5 cursor-pointer hover:border-siragon-orange transition-all group relative">
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 flex items-center justify-center">
-                                {media.base64 && <Search className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />}
+                                {(media.base64 || media.url) && <Search className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />}
                               </div>
-                              {media.base64 ? (
-                                media.type === "image" ? <img src={media.base64} alt={media.name} className="w-full h-24 object-cover" /> : <video src={media.base64} className="w-full h-24 object-cover" />
+                              {media.base64 || media.url ? (
+                                media.type === "image" ? <img src={media.url || media.base64} alt={media.name} className="w-full h-24 object-cover" /> : <video src={media.url || media.base64} className="w-full h-24 object-cover" />
                               ) : (
                                 <div className="w-full h-24 flex items-center justify-center bg-black/5 text-black/20">{media.type === "image" ? <ImageIcon size={24} /> : <Video size={24} />}</div>
                               )}
@@ -398,8 +529,8 @@ export default function ProductosPage() {
                         <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">Fotografía Principal</label>
                         <div className="flex items-center gap-4 p-4 border border-black/10 rounded-2xl bg-white shadow-sm">
                           <div className="w-16 h-16 rounded-xl bg-black/5 flex-shrink-0 overflow-hidden border border-black/5 flex items-center justify-center">
-                            {editForm.productPhoto?.base64 ? (
-                              <img src={editForm.productPhoto.base64} className="w-full h-full object-cover" />
+                            {editForm.productPhoto?.url || editForm.productPhoto?.base64 ? (
+                              <img src={editForm.productPhoto.url || editForm.productPhoto.base64} className="w-full h-full object-cover" />
                             ) : <ImageIcon size={24} className="text-black/20" />}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -461,9 +592,9 @@ export default function ProductosPage() {
               <X size={32} />
             </button>
             {previewMedia.type === "image" ? (
-              <img src={previewMedia.base64} alt={previewMedia.name} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+              <img src={previewMedia.url || previewMedia.base64} alt={previewMedia.name} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
             ) : (
-              <video src={previewMedia.base64} controls autoPlay className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+              <video src={previewMedia.url || previewMedia.base64} controls autoPlay className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
             )}
             <p className="mt-4 text-white text-sm font-medium bg-black/50 px-4 py-1.5 rounded-full backdrop-blur-sm">{previewMedia.name}</p>
           </div>

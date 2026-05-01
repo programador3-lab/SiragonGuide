@@ -49,76 +49,70 @@ export default function Login() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Link
-              href="/productos"
-              className="rounded-xl bg-siragon-orange border border-transparent px-4 py-2 text-xs font-bold text-white hover:bg-siragon-orange-dark shadow-sm transition-all"
-            >
-              Catálogo Local
-            </Link>
           </div>
         </div>
       </nav>
 
       <div className="flex-1 flex items-center justify-center px-6 relative z-10 w-full py-12">
         <div className="relative bg-white p-10 md:p-14 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-full max-w-lg border border-black/10 group">
-        <div className="text-center mb-10">
-          <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-black text-white shadow-lg">
-            <LockKeyhole size={32} />
-          </div>
-          <h2 className="text-3xl font-light tracking-tight text-black mb-2">
-            Iniciar <span className="font-bold text-siragon-orange">Sesión</span>
-          </h2>
-        </div>
-
-        {error && (
-          <div className="mb-8 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
-            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2 relative">
-            <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
-              Correo Electrónico
-            </label>
-            <div className="relative flex items-center">
-              <Mail size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
-              <input
-                type="email"
-                className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
-                placeholder="tu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+          <div className="text-center mb-10">
+            <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-black text-white shadow-lg">
+              <LockKeyhole size={32} />
             </div>
+            <h2 className="text-3xl font-light tracking-tight text-black mb-2">
+              Iniciar <span className="font-bold text-siragon-orange">Sesión</span>
+            </h2>
           </div>
 
-          <div className="space-y-2 relative">
-            <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
-              Contraseña
-            </label>
-            <div className="relative flex items-center">
-              <LockKeyhole size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
-              <input
-                type="password"
-                className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+          {error && (
+            <div className="mb-8 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
+              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+              {error}
             </div>
-          </div>
+          )}
 
-          <button
-            type="submit"
-            className="mt-4 w-full bg-black hover:bg-siragon-orange text-white font-bold py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_20px_rgba(238,116,2,0.3)] flex justify-center items-center gap-2 disabled:opacity-70"
-          >
-            Ingresar al Panel
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2 relative">
+              <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
+                Correo Electrónico
+              </label>
+              <div className="relative flex items-center">
+                <Mail size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
+                <input
+                  type="email"
+                  className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
+                  placeholder="tu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 relative">
+              <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
+                Contraseña
+              </label>
+              <div className="relative flex items-center">
+                <LockKeyhole size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
+                <input
+                  type="password"
+                  className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="mt-4 w-full bg-black hover:bg-siragon-orange text-white font-bold py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_20px_rgba(238,116,2,0.3)] flex justify-center items-center gap-2 disabled:opacity-70"
+            >
+              Ingresar al Panel
+            </button>
+          </form>
         </div>
       </div>
     </main>

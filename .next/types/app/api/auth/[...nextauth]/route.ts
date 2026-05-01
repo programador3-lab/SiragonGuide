@@ -1,4 +1,4 @@
-// File: C:\Users\programador.ivoo2\Desktop\Pagina\src\app\api\auth\[...nextauth]\route.ts
+// File: C:\Users\programador03\Desktop\Pagina\src\app\api\auth\[...nextauth]\route.ts
 import * as entry from '../../../../../../src/app/api/auth/[...nextauth]/route.js'
 import type { NextRequest } from 'next/server.js'
 
