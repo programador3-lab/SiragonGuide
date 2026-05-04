@@ -104,15 +104,28 @@ export default function ProductosPage() {
     if (!editForm) return;
 
     const uploadFile = async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Error al subir archivo");
+        throw new Error(err.message || "Error al obtener URL de subida");
       }
-      const data = await res.json();
-      return data.url;
+      const { presignedUrl, url } = await res.json();
+
+      const uploadRes = await fetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Error al subir archivo a AWS S3");
+      }
+
+      return url;
     };
 
     try {

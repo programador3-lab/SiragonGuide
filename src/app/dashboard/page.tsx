@@ -139,15 +139,32 @@ export default function DashboardPage() {
     }
 
     const uploadFile = async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      // 1. Obtener la Presigned URL
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
+      
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData?.message || "Error al subir archivo: " + file.name);
+        throw new Error(errorData?.message || "Error al obtener URL de subida para: " + file.name);
       }
-      const data = await res.json();
-      return data.url;
+      
+      const { presignedUrl, url } = await res.json();
+
+      // 2. Subir directamente a S3
+      const uploadRes = await fetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Error al subir archivo a AWS S3: " + file.name);
+      }
+
+      return url;
     };
 
     try {

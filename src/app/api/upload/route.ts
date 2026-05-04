@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -19,37 +20,30 @@ export async function POST(req: Request) {
   }
 
   try {
-    const data = await req.formData();
-    const file: File | null = data.get("file") as unknown as File;
+    const { filename, contentType } = await req.json();
 
-    if (!file) {
-      return NextResponse.json({ message: "No se encontró ningún archivo" }, { status: 400 });
+    if (!filename || !contentType) {
+      return NextResponse.json({ message: "Faltan datos del archivo" }, { status: 400 });
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     // Create a safe, unique filename
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const safeOriginalName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-    const filename = uniqueSuffix + "-" + safeOriginalName;
-    const s3Key = `media/${filename}`;
+    const safeOriginalName = filename.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const safeFilename = uniqueSuffix + "-" + safeOriginalName;
+    const s3Key = `media/${safeFilename}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME as string,
       Key: s3Key,
-      Body: buffer,
-      ContentType: file.type,
-      // ACL: 'public-read' // Opcional, dependiendo de la configuración de tu bucket
+      ContentType: contentType,
     });
 
-    await s3Client.send(command);
-
+    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
     const url = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ presignedUrl, url });
   } catch (error: any) {
-    console.error("Error subiendo archivo a S3:", error);
-    return NextResponse.json({ message: "Error al subir el archivo: " + (error.message || "Desconocido") }, { status: 500 });
+    console.error("Error generando presigned URL de S3:", error);
+    return NextResponse.json({ message: "Error al generar URL de subida: " + (error.message || "Desconocido") }, { status: 500 });
   }
 }
