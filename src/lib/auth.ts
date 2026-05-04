@@ -43,8 +43,9 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
           };
         } catch (error) {
-          console.error("ERROR EN BASE DE DATOS DURANTE LOGIN:", error);
-          throw new Error("Error de conexión con la base de datos");
+          console.log("DETALLE TECNICO DEL ERROR:", JSON.stringify(error, null, 2));
+          console.error("ERROR COMPLETO:", error);
+          throw new Error("Fallo de conexión");
         }
       }
     })
