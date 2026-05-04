@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION as string,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+  },
+});
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -18,19 +26,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "No se encontró ningún archivo" }, { status: 400 });
     }
 
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
     // Create a safe, unique filename
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    // Sanitize filename to prevent directory traversal or special character issues
     const safeOriginalName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
     const filename = uniqueSuffix + "-" + safeOriginalName;
+    const s3Key = `media/${filename}`;
 
-    const blob = await put(`media/${filename}`, file, {
-      access: 'public',
+    const command = new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME as string,
+      Key: s3Key,
+      Body: buffer,
+      ContentType: file.type,
+      // ACL: 'public-read' // Opcional, dependiendo de la configuración de tu bucket
     });
 
-    return NextResponse.json({ url: blob.url });
+    await s3Client.send(command);
+
+    const url = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+
+    return NextResponse.json({ url });
   } catch (error: any) {
-    console.error("Error subiendo archivo:", error);
+    console.error("Error subiendo archivo a S3:", error);
     return NextResponse.json({ message: "Error al subir el archivo: " + (error.message || "Desconocido") }, { status: 500 });
   }
 }
