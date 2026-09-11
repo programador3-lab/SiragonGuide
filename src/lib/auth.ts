@@ -16,23 +16,26 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          const email = credentials.email.trim().toLowerCase();
+
           const user = await prisma.user.findUnique({
             where: {
-              email: credentials.email
+              email
             }
           });
 
           if (!user) {
-            console.log("Usuario no encontrado:", credentials.email);
+            console.log("Usuario no encontrado:", email);
             return null;
           }
 
           // En producción, usa bcrypt para comparar contraseñas
           // const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-          const isPasswordValid = credentials.password === user.password;
+          const password = credentials.password.trim();
+          const isPasswordValid = password === user.password;
 
           if (!isPasswordValid) {
-            console.log("Contraseña incorrecta para:", credentials.email);
+            console.log("Contraseña incorrecta para:", email);
             return null;
           }
 

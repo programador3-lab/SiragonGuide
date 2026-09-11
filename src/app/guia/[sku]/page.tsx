@@ -61,6 +61,8 @@ export default async function GuiaPage({ params }: PageProps) {
                       src={mainImage}
                       height="1000"
                       width="1000"
+                      decoding="async"
+                      fetchPriority="high"
                       className="absolute inset-0 h-full w-full rounded-xl object-contain p-8 transition-shadow group-hover/card:shadow-xl"
                       alt={product.productName}
                     />

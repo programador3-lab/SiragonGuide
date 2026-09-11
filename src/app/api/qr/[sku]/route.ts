@@ -13,12 +13,13 @@ export async function GET(req: Request, { params }: { params: { sku: string } })
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
     const cleanBaseUrl = baseUrl.replace(/\/$/, "");
     const productUrl = `${cleanBaseUrl}/guia/${encodeURIComponent(sku)}`;
+    const safeSku = sku.replace(/[^a-zA-Z0-9._-]/g, "_");
 
     // Generar el código QR como buffer de imagen PNG
     const qrBuffer = await QRCode.toBuffer(productUrl, {
       type: "png",
-      margin: 1,
-      width: 600,
+      margin: 4,
+      width: 1600,
       color: {
         dark: "#000000",
         light: "#ffffff"
@@ -29,6 +30,7 @@ export async function GET(req: Request, { params }: { params: { sku: string } })
     return new NextResponse(qrBuffer as any, {
       headers: {
         "Content-Type": "image/png",
+        "Content-Disposition": `inline; filename="QR_Siragon_${safeSku}.png"`,
         "Cache-Control": "public, max-age=86400, s-maxage=86400"
       }
     });

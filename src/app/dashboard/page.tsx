@@ -5,6 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Image as ImageIcon, Upload, CheckCircle2, AlertCircle, Sparkles, X } from "lucide-react";
 import AdminNavbar from "@/components/AdminNavbar";
+import { getMediaType, imageAccept, mediaAccept, prepareMediaFileForUpload, uploadMediaFile } from "@/lib/mediaFiles";
 
 type MediaPreview = {
   id: string;
@@ -46,16 +47,23 @@ export default function DashboardPage() {
   }, [productPhoto, guideMedia, tipsMedia]);
 
   const mapFilesToMedia = async (files: FileList): Promise<MediaPreview[]> => {
-    const validFiles = Array.from(files).filter(
-      (file) => file.type.startsWith("image/") || file.type.startsWith("video/")
-    );
-    return validFiles.map((file) => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      name: file.name,
-      type: file.type.startsWith("video/") ? "video" : "image",
-      previewUrl: URL.createObjectURL(file),
-      file,
-    }));
+    const items: MediaPreview[] = [];
+
+    for (const file of Array.from(files)) {
+      const mediaType = getMediaType(file);
+      if (!mediaType) continue;
+      const uploadFile = await prepareMediaFileForUpload(file, mediaType);
+
+      items.push({
+        id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        type: mediaType,
+        previewUrl: URL.createObjectURL(uploadFile),
+        file: uploadFile,
+      });
+    }
+
+    return items;
   };
 
   const handleMediaChange = async (
@@ -65,22 +73,27 @@ export default function DashboardPage() {
     const files = event.target.files;
     if (!files?.length) return;
 
-    const mediaItems = await mapFilesToMedia(files);
-    if (target === "product") {
-      const firstImage = mediaItems.find((item) => item.type === "image") || mediaItems[0];
-      if (productPhoto) URL.revokeObjectURL(productPhoto.previewUrl);
-      if (firstImage) setProductPhoto(firstImage);
+    try {
+      const mediaItems = await mapFilesToMedia(files);
+      if (target === "product") {
+        const firstImage = mediaItems.find((item) => item.type === "image") || mediaItems[0];
+        if (productPhoto) URL.revokeObjectURL(productPhoto.previewUrl);
+        if (firstImage) setProductPhoto(firstImage);
+        event.target.value = "";
+        return;
+      }
+
+      if (target === "guide") {
+        setGuideMedia((prev) => [...prev, ...mediaItems]);
+      } else {
+        setTipsMedia((prev) => [...prev, ...mediaItems]);
+      }
+
       event.target.value = "";
-      return;
+    } catch (err: any) {
+      setError(err.message || "No se pudo preparar el archivo.");
+      event.target.value = "";
     }
-
-    if (target === "guide") {
-      setGuideMedia((prev) => [...prev, ...mediaItems]);
-    } else {
-      setTipsMedia((prev) => [...prev, ...mediaItems]);
-    }
-
-    event.target.value = "";
   };
 
   const removeMedia = (id: string, target: "guide" | "tips") => {
@@ -118,46 +131,17 @@ export default function DashboardPage() {
       return;
     }
 
-    const uploadFile = async (file: File) => {
-      // 1. Obtener la Presigned URL
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData?.message || "Error al obtener URL de subida para: " + file.name);
-      }
-      
-      const { presignedUrl, url } = await res.json();
-
-      // 2. Subir directamente a S3
-      const uploadRes = await fetch(presignedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Error al subir archivo a AWS S3: " + file.name);
-      }
-
-      return url;
-    };
-
     try {
       let finalProductPhoto = null;
       if (productPhoto?.file) {
-        const url = await uploadFile(productPhoto.file);
+        const url = await uploadMediaFile(productPhoto.file);
         finalProductPhoto = { name: productPhoto.name, type: productPhoto.type, url };
       }
 
       const finalGuideMedia = [];
       for (const item of guideMedia) {
         if (item.file) {
-          const url = await uploadFile(item.file);
+          const url = await uploadMediaFile(item.file);
           finalGuideMedia.push({ name: item.name, type: item.type, url });
         }
       }
@@ -165,7 +149,7 @@ export default function DashboardPage() {
       const finalTipsMedia = [];
       for (const item of tipsMedia) {
         if (item.file) {
-          const url = await uploadFile(item.file);
+          const url = await uploadMediaFile(item.file);
           finalTipsMedia.push({ name: item.name, type: item.type, url });
         }
       }
@@ -194,7 +178,7 @@ export default function DashboardPage() {
       tipsMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setGuideMedia([]);
       setTipsMedia([]);
-      setMessage("Producto guardado exitosamente en la base de datos.");
+      setMessage("Producto guardado.");
     } catch (err: any) {
       setError(err.message || "Ocurrio un error al guardar");
     } finally {
@@ -240,7 +224,7 @@ export default function DashboardPage() {
         </div>
         <label className="cursor-pointer rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-zinc-400 transition-all hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-300">
           + Añadir archivos
-          <input type="file" accept="image/*,video/*" multiple onChange={(e) => handleMediaChange(e, target)} className="hidden" />
+          <input type="file" accept={mediaAccept} multiple onChange={(e) => handleMediaChange(e, target)} className="hidden" />
         </label>
       </div>
 
@@ -362,7 +346,7 @@ export default function DashboardPage() {
               </div>
               <input
                 type="file"
-                accept="image/*"
+                accept={imageAccept}
                 onChange={(e) => handleMediaChange(e, "product")}
                 className="block w-full cursor-pointer rounded-xl border border-dashed border-white/[0.06] bg-zinc-950/40 px-4 py-3 text-sm text-zinc-600 transition-colors file:mr-4 file:rounded-xl file:border-0 file:bg-orange-500/15 file:px-4 file:py-2 file:text-[11px] file:font-bold file:text-orange-400 hover:file:bg-orange-500 hover:file:text-white"
               />

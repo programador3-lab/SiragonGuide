@@ -1,4 +1,4 @@
-// File: C:\Users\jose.marin\Desktop\SiragonGuide\src\app\api\guides\route.ts
+// File: C:\Users\jose.marin\Desktop\SiragonGuide\SiragonGuide-lino1\src\app\api\guides\route.ts
 import * as entry from '../../../../../src/app/api/guides/route.js'
 import type { NextRequest } from 'next/server.js'
 

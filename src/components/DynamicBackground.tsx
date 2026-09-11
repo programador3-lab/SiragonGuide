@@ -21,10 +21,10 @@ export default function DynamicBackground() {
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         src="https://player.vimeo.com/external/517618080.sd.mp4?s=1240c1598f483c6753177f980131102e3b3c3735&profile_id=165"
         className="absolute inset-0 h-full w-full object-cover opacity-65 saturate-125 transition-opacity duration-1000"
-        style={{ transform: "translateZ(0)", willChange: "transform" }}
+        style={{ transform: "translateZ(0)" }}
       />
 
       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/85 via-zinc-900/35 to-transparent" />

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import AdminNavbar from "@/components/AdminNavbar";
+import { getMediaType, imageAccept, mediaAccept, prepareMediaFileForUpload, uploadMediaFile } from "@/lib/mediaFiles";
 
 type LocalProductMediaEntry = {
   id: string;
@@ -34,18 +35,12 @@ export default function ProductosPage() {
   const [previewMedia, setPreviewMedia] = useState<{ name: string; type: "image" | "video"; base64?: string; url?: string } | null>(null);
 
   const downloadQR = (sku: string) => {
-    const canvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
-    if (canvas) {
-      const pngUrl = canvas
-        .toDataURL("image/png")
-        .replace("image/png", "image/octet-stream");
-      const downloadLink = document.createElement("a");
-      downloadLink.href = pngUrl;
-      downloadLink.download = `QR_Siragon_${sku}.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-    }
+    const downloadLink = document.createElement("a");
+    downloadLink.href = `/api/qr/${encodeURIComponent(sku)}?size=print`;
+    downloadLink.download = `QR_Siragon_${sku}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
   };
 
   useEffect(() => {
@@ -108,49 +103,24 @@ export default function ProductosPage() {
   const handleSave = async () => {
     if (!editForm) return;
 
-    const uploadFile = async (file: File) => {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Error al obtener URL de subida");
-      }
-      const { presignedUrl, url } = await res.json();
-
-      const uploadRes = await fetch(presignedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Error al subir archivo a AWS S3");
-      }
-
-      return url;
-    };
-
     try {
       const finalForm = { ...editForm, guideMedia: [...editForm.guideMedia], tipsMedia: [...editForm.tipsMedia] };
 
       if (finalForm.productPhoto?.file) {
-        finalForm.productPhoto = { ...finalForm.productPhoto, url: await uploadFile(finalForm.productPhoto.file) };
+        finalForm.productPhoto = { ...finalForm.productPhoto, url: await uploadMediaFile(finalForm.productPhoto.file) };
         delete finalForm.productPhoto.file;
         delete finalForm.productPhoto.base64;
       }
       for (let i = 0; i < finalForm.guideMedia.length; i++) {
         if (finalForm.guideMedia[i].file) {
-          finalForm.guideMedia[i] = { ...finalForm.guideMedia[i], url: await uploadFile(finalForm.guideMedia[i].file as File) };
+          finalForm.guideMedia[i] = { ...finalForm.guideMedia[i], url: await uploadMediaFile(finalForm.guideMedia[i].file as File) };
           delete finalForm.guideMedia[i].file;
           delete finalForm.guideMedia[i].base64;
         }
       }
       for (let i = 0; i < finalForm.tipsMedia.length; i++) {
         if (finalForm.tipsMedia[i].file) {
-          finalForm.tipsMedia[i] = { ...finalForm.tipsMedia[i], url: await uploadFile(finalForm.tipsMedia[i].file as File) };
+          finalForm.tipsMedia[i] = { ...finalForm.tipsMedia[i], url: await uploadMediaFile(finalForm.tipsMedia[i].file as File) };
           delete finalForm.tipsMedia[i].file;
           delete finalForm.tipsMedia[i].base64;
         }
@@ -195,42 +165,57 @@ export default function ProductosPage() {
     const files = e.target.files;
     if (!files?.length || !editForm) return;
 
-    const validFiles = Array.from(files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    const newMedia: { name: string; type: "image" | "video"; base64?: string; file?: File }[] = [];
+    try {
+      const newMedia: { name: string; type: "image" | "video"; base64?: string; file?: File }[] = [];
 
-    for (const file of validFiles) {
-      newMedia.push({
-        name: file.name,
-        type: file.type.startsWith("video/") ? "video" : "image",
-        base64: URL.createObjectURL(file),
-        file,
-      });
-    }
+      for (const file of Array.from(files)) {
+        const mediaType = getMediaType(file);
+        if (!mediaType) continue;
+        const uploadFile = await prepareMediaFileForUpload(file, mediaType);
 
-    if (target === "guide") {
-      setEditForm({ ...editForm, guideMedia: [...editForm.guideMedia, ...newMedia] });
-    } else {
-      setEditForm({ ...editForm, tipsMedia: [...editForm.tipsMedia, ...newMedia] });
+        newMedia.push({
+          name: file.name,
+          type: mediaType,
+          base64: URL.createObjectURL(uploadFile),
+          file: uploadFile,
+        });
+      }
+
+      if (target === "guide") {
+        setEditForm({ ...editForm, guideMedia: [...editForm.guideMedia, ...newMedia] });
+      } else {
+        setEditForm({ ...editForm, tipsMedia: [...editForm.tipsMedia, ...newMedia] });
+      }
+    } catch (err: any) {
+      alert(err.message || "No se pudo preparar el archivo.");
+    } finally {
+      e.target.value = "";
     }
-    e.target.value = "";
   };
 
   const handleProductPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editForm) return;
 
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) return;
+    try {
+      const mediaType = getMediaType(file);
+      if (mediaType !== "image") return;
+      const uploadFile = await prepareMediaFileForUpload(file, mediaType);
 
-    setEditForm({
-      ...editForm,
-      productPhoto: {
-        name: file.name,
-        type: file.type.startsWith("video/") ? "video" : "image",
-        base64: URL.createObjectURL(file),
-        file,
-      },
-    });
-    e.target.value = "";
+      setEditForm({
+        ...editForm,
+        productPhoto: {
+          name: file.name,
+          type: mediaType,
+          base64: URL.createObjectURL(uploadFile),
+          file: uploadFile,
+        },
+      });
+    } catch (err: any) {
+      alert(err.message || "No se pudo preparar el archivo.");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const filteredItems = useMemo(() => {
@@ -357,6 +342,8 @@ export default function ProductosPage() {
                     <img
                       src={row.productPhoto.url || row.productPhoto.base64}
                       alt={row.productName}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                   ) : (
@@ -472,6 +459,8 @@ export default function ProductosPage() {
                         <img
                           src={selectedProduct.productPhoto.url || selectedProduct.productPhoto.base64}
                           alt={selectedProduct.productName}
+                          loading="lazy"
+                          decoding="async"
                           className="h-64 w-full object-cover"
                         />
                       ) : (
@@ -536,7 +525,7 @@ export default function ProductosPage() {
                             <button
                               onClick={() => {
                                 const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, "");
-                                navigator.clipboard.writeText(`${baseUrl}/api/qr/${encodeURIComponent(selectedProduct.sku)}`);
+                                navigator.clipboard.writeText(`${baseUrl}/api/qr/${encodeURIComponent(selectedProduct.sku)}?size=print`);
                                 alert("URL de imagen copiada.");
                               }}
                               className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-2.5 text-[11px] font-bold text-zinc-500 transition-all hover:border-white/15 hover:text-zinc-200"
@@ -576,9 +565,9 @@ export default function ProductosPage() {
                                 </div>
                                 {media.base64 || media.url ? (
                                   media.type === "image" ? (
-                                    <img src={media.url || media.base64} alt={media.name} className="h-24 w-full object-cover" />
+                                    <img src={media.url || media.base64} alt={media.name} loading="lazy" decoding="async" className="h-24 w-full object-cover" />
                                   ) : (
-                                    <video src={media.url || media.base64} className="h-24 w-full object-cover" />
+                                    <video src={media.url || media.base64} className="h-24 w-full object-cover" preload="metadata" />
                                   )
                                 ) : (
                                   <div className="flex h-24 items-center justify-center bg-zinc-950 text-zinc-700">
@@ -626,7 +615,7 @@ export default function ProductosPage() {
                         <div className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-zinc-950/40 p-4">
                           <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-950">
                             {editForm.productPhoto?.url || editForm.productPhoto?.base64 ? (
-                              <img src={editForm.productPhoto.url || editForm.productPhoto.base64} className="h-full w-full object-cover" />
+                              <img src={editForm.productPhoto.url || editForm.productPhoto.base64} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                             ) : (
                               <ImageIcon size={22} className="text-zinc-700" />
                             )}
@@ -635,7 +624,7 @@ export default function ProductosPage() {
                             <p className="mb-2 truncate text-xs text-zinc-600">{editForm.productPhoto?.name || "Sin foto"}</p>
                             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/[0.07] bg-white/[0.04] px-3 py-2 text-[11px] font-bold text-zinc-500 transition-all hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-300">
                               <Upload size={12} /> Cambiar imagen
-                              <input type="file" accept="image/*" className="hidden" onChange={handleProductPhotoChange} />
+                              <input type="file" accept={imageAccept} className="hidden" onChange={handleProductPhotoChange} />
                             </label>
                           </div>
                         </div>
@@ -654,7 +643,7 @@ export default function ProductosPage() {
                               </h4>
                               <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold text-zinc-600 transition-all hover:border-orange-500/40 hover:text-orange-300">
                                 <Upload size={11} /> Añadir
-                                <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={(e) => handleFileChange(e, section.target)} />
+                                <input type="file" multiple accept={mediaAccept} className="hidden" onChange={(e) => handleFileChange(e, section.target)} />
                               </label>
                             </div>
                             <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
@@ -706,6 +695,8 @@ export default function ProductosPage() {
               <img
                 src={previewMedia.url || previewMedia.base64}
                 alt={previewMedia.name}
+                loading="lazy"
+                decoding="async"
                 className="max-h-[82vh] max-w-full rounded-2xl object-contain shadow-2xl"
               />
             ) : (
@@ -713,6 +704,7 @@ export default function ProductosPage() {
                 src={previewMedia.url || previewMedia.base64}
                 controls
                 autoPlay
+                preload="metadata"
                 className="max-h-[82vh] max-w-full rounded-2xl object-contain shadow-2xl"
               />
             )}

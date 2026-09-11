@@ -26,6 +26,8 @@ export default function MediaGallery({ items, title }: { items: MediaItem[], tit
                 <img
                   src={item.url || item.base64}
                   alt={item.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute right-4 top-4 rounded-xl bg-black/60 p-2 text-white backdrop-blur-sm">

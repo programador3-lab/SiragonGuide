@@ -1,13 +1,13 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/guides/[id]/route": "app/api/guides/[id]/route.js",
-  "/api/upload/route": "app/api/upload/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/guides/route": "app/api/guides/route.js",
   "/api/qr/[sku]/route": "app/api/qr/[sku]/route.js",
-  "/guia/[sku]/page": "app/guia/[sku]/page.js",
+  "/api/upload/route": "app/api/upload/route.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/page": "app/page.js",
+  "/guia/[sku]/page": "app/guia/[sku]/page.js",
   "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
   "/productos/page": "app/productos/page.js"
 }
