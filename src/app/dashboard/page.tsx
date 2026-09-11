@@ -3,8 +3,8 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { LogOut, Plus, Upload, LayoutGrid } from "lucide-react";
-import Link from "next/link";
+import { Image as ImageIcon, Upload, CheckCircle2, AlertCircle, Sparkles, X } from "lucide-react";
+import AdminNavbar from "@/components/AdminNavbar";
 
 type MediaPreview = {
   id: string;
@@ -12,16 +12,6 @@ type MediaPreview = {
   type: "image" | "video";
   previewUrl: string;
   file?: File;
-};
-
-type LocalProductMediaEntry = {
-  id: string;
-  productName: string;
-  sku: string;
-  productPhoto: { name: string; type: "image" | "video"; url?: string } | null;
-  guideMedia: { name: string; type: "image" | "video"; url?: string }[];
-  tipsMedia: { name: string; type: "image" | "video"; url?: string }[];
-  createdAt: string;
 };
 
 const initialForm = {
@@ -59,17 +49,13 @@ export default function DashboardPage() {
     const validFiles = Array.from(files).filter(
       (file) => file.type.startsWith("image/") || file.type.startsWith("video/")
     );
-    const results: MediaPreview[] = [];
-    for (const file of validFiles) {
-      results.push({
-        id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        type: file.type.startsWith("video/") ? "video" : "image",
-        previewUrl: URL.createObjectURL(file),
-        file: file,
-      });
-    }
-    return results;
+    return validFiles.map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: file.name,
+      type: file.type.startsWith("video/") ? "video" : "image",
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
   };
 
   const handleMediaChange = async (
@@ -98,20 +84,14 @@ export default function DashboardPage() {
   };
 
   const removeMedia = (id: string, target: "guide" | "tips") => {
-    if (target === "guide") {
-      setGuideMedia((prev) => {
-        const item = prev.find((entry) => entry.id === id);
-        if (item) URL.revokeObjectURL(item.previewUrl);
-        return prev.filter((entry) => entry.id !== id);
-      });
-      return;
-    }
-
-    setTipsMedia((prev) => {
-      const item = prev.find((entry) => entry.id === id);
+    const remove = (items: MediaPreview[]) => {
+      const item = items.find((entry) => entry.id === id);
       if (item) URL.revokeObjectURL(item.previewUrl);
-      return prev.filter((entry) => entry.id !== id);
-    });
+      return items.filter((entry) => entry.id !== id);
+    };
+
+    if (target === "guide") setGuideMedia(remove);
+    else setTipsMedia(remove);
   };
 
   const removeProductPhoto = () => {
@@ -190,18 +170,16 @@ export default function DashboardPage() {
         }
       }
 
-      const newEntry = {
-        productName: form.productName.trim(),
-        sku: form.sku.trim(),
-        productPhoto: finalProductPhoto,
-        guideMedia: finalGuideMedia,
-        tipsMedia: finalTipsMedia,
-      };
-
       const res = await fetch("/api/guides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEntry),
+        body: JSON.stringify({
+          productName: form.productName.trim(),
+          sku: form.sku.trim(),
+          productPhoto: finalProductPhoto,
+          guideMedia: finalGuideMedia,
+          tipsMedia: finalTipsMedia,
+        }),
       });
 
       if (!res.ok) {
@@ -218,7 +196,7 @@ export default function DashboardPage() {
       setTipsMedia([]);
       setMessage("Producto guardado exitosamente en la base de datos.");
     } catch (err: any) {
-      setError(err.message || "Ocurrió un error al guardar");
+      setError(err.message || "Ocurrio un error al guardar");
     } finally {
       setLoading(false);
     }
@@ -226,94 +204,142 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-white text-black gap-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-siragon-orange/10 via-transparent to-transparent opacity-80" />
-        <div className="relative z-10 flex flex-col items-center gap-6">
-          <div className="w-12 h-12 border-4 border-black/10 border-t-siragon-orange rounded-full animate-spin" />
-          <p className="text-xs font-bold tracking-[0.2em] text-black/40 uppercase">Cargando Panel</p>
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_800px_500px_at_50%_-20%,rgba(249,115,22,0.12),transparent_70%)]" />
+        <div className="relative z-10 flex flex-col items-center gap-5">
+          <div className="relative h-14 w-14">
+            <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-orange-500" />
+            <div className="absolute inset-2 animate-spin rounded-full border-2 border-transparent border-t-orange-400/50 [animation-direction:reverse]" />
+          </div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-600">Cargando panel</p>
         </div>
       </main>
     );
   }
 
-  return (
-    <main className="relative min-h-screen font-sans selection:bg-siragon-orange selection:text-white overflow-hidden bg-white text-black">
-      {/* Background Overlays */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-siragon-orange/10 via-transparent to-transparent opacity-80" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-black/5 via-transparent to-transparent" />
+  const mediaBlock = (
+    title: string,
+    subtitle: string,
+    target: "guide" | "tips",
+    items: MediaPreview[],
+    accentColor: string
+  ) => (
+    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-900/50 p-7 backdrop-blur-xl transition-all duration-300 hover:border-orange-500/30 hover:bg-zinc-900/70">
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-10 bottom-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2.5">
+            <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${accentColor}`}>
+              <Upload size={15} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-zinc-100">{title}</span>
+          </div>
+          <p className="ml-[42px] text-[11px] text-zinc-600">{subtitle}</p>
+        </div>
+        <label className="cursor-pointer rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-zinc-400 transition-all hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-300">
+          + Añadir archivos
+          <input type="file" accept="image/*,video/*" multiple onChange={(e) => handleMediaChange(e, target)} className="hidden" />
+        </label>
       </div>
 
-      <nav className="sticky top-0 z-50 bg-black border-b border-white/10 shadow-sm">
-        <div className="flex items-center justify-between px-8 h-[45px] max-w-7xl mx-auto w-full">
-          {/* Síragon Official Links */}
-          <div className="flex items-center gap-8">
-            <a href="https://siragon.com">
-              <img src="https://siragon.com/wp-content/uploads/2023/03/Logo-Siragon_Blanco-e1684488951400.png" alt="Síragon" className="h-6 w-auto" />
-            </a>
-          </div>
-
-          {/* App Actions */}
-          <div className="flex items-center gap-4">
-            <Link
-              href="/productos"
-              className="rounded-xl bg-siragon-orange border border-transparent px-4 py-2 text-xs font-bold text-white hover:bg-siragon-orange-dark shadow-sm transition-all"
-            >
-              Productos
-            </Link>
-            <span className="text-white/50 text-xs font-medium hidden sm:inline-block">
-              {session?.user?.email}
-            </span>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-white text-xs font-bold hover:bg-red-500 transition-colors"
-            >
-              <LogOut size={14} />
-              Salir
-            </button>
-          </div>
+      {items.length === 0 ? (
+        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/[0.06] text-zinc-700 text-xs">
+          Arrastra o selecciona archivos para cargar
         </div>
-      </nav>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {items.map((item) => (
+            <div key={item.id} className="group/card relative overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-950/60 transition-all hover:border-orange-500/30">
+              {item.type === "image" ? (
+                <img src={item.previewUrl} alt={item.name} className="h-24 w-full object-cover transition-transform duration-300 group-hover/card:scale-105" />
+              ) : (
+                <video src={item.previewUrl} className="h-24 w-full object-cover" controls />
+              )}
+              <div className="p-2">
+                <p className="mb-2 truncate text-[10px] font-medium text-zinc-600">{item.name}</p>
+                <button
+                  type="button"
+                  onClick={() => removeMedia(item.id, target)}
+                  className="flex w-full items-center justify-center gap-1 rounded-lg bg-red-500/10 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-500/70 transition-all hover:bg-red-500 hover:text-white"
+                >
+                  <X size={10} /> Quitar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
-      <section className="relative z-10 max-w-4xl mx-auto px-6 py-16">
-        <div className="group relative rounded-[2.5rem] p-8 md:p-12 transition-all duration-500 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-black/10">
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-zinc-950 font-sans text-zinc-100 selection:bg-orange-500/30 selection:text-orange-300">
+      {/* Background layers */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_900px_600px_at_50%_-10%,rgba(249,115,22,0.10),transparent_65%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_600px_400px_at_80%_80%,rgba(249,115,22,0.05),transparent_70%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.015\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
 
+      <AdminNavbar
+        active="dashboard"
+        email={session?.user?.email}
+        onSignOut={() => signOut({ callbackUrl: "/login" })}
+      />
 
-          <h2 className="text-4xl font-light tracking-tight text-black mb-2">
-            Agregar Nuevo <span className="font-bold text-siragon-orange">Producto</span>
-          </h2>
-          <p className="text-black/60 mb-10 leading-relaxed max-w-2xl">
+      <section className="relative z-10 mx-auto max-w-5xl px-6 pb-24 pt-36">
+        {/* Header */}
+        <div className="mb-12">
+          <h1 className="text-5xl font-black tracking-tight text-white md:text-6xl">
+            Agregar{" "}
+            <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent">
+              producto
+            </span>
+          </h1>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
+            Carga la foto principal, guías de instalación y tips que se mostrarán al consultar el modelo vía QR.
           </p>
+        </div>
 
-          {error && (
-            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600 flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              {error}
-            </div>
-          )}
-          {message && (
-            <div className="mb-8 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700 flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              {message}
-            </div>
-          )}
+        {/* Alerts */}
+        {error && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.08] p-4 text-sm text-red-400">
+            <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-green-500/20 bg-green-500/[0.08] p-4 text-sm text-green-400">
+            <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0" />
+            {message}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
+        {/* Main card */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-zinc-900/40 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl md:p-12">
+          <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/40 to-transparent" />
+
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Fields row */}
+            <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">Nombre del equipo</label>
+                <label className="ml-1 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+                  Nombre del equipo
+                </label>
                 <input
-                  className="w-full rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
-                  placeholder="Ej. Síragon SP-7000..."
+                  className="w-full rounded-xl border border-white/[0.07] bg-zinc-950/60 px-5 py-4 text-sm font-medium text-zinc-100 outline-none transition-all placeholder:text-zinc-700 hover:border-white/15 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="Ej. Siragon SP-7000..."
                   value={form.productName}
                   onChange={(e) => setForm((prev) => ({ ...prev, productName: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">SKU / Modelo</label>
+                <label className="ml-1 text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+                  SKU / Modelo
+                </label>
                 <input
-                  className="w-full rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
+                  className="w-full rounded-xl border border-white/[0.07] bg-zinc-950/60 px-5 py-4 text-sm font-medium text-zinc-100 outline-none transition-all placeholder:text-zinc-700 hover:border-white/15 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
                   placeholder="Ej. SKU-9281A..."
                   value={form.sku}
                   onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
@@ -322,120 +348,72 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-white shadow-sm p-6 transition-colors hover:border-black/20">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-black">
-                <div className="p-1.5 rounded-lg bg-black text-white">
-                  <Upload size={16} />
+            {/* Product photo */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-900/50 p-7 backdrop-blur-xl transition-all hover:border-orange-500/30 hover:bg-zinc-900/70">
+              <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mb-5 flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600">
+                  <ImageIcon size={15} className="text-white" />
                 </div>
-                Fotografía Principal
+                <div>
+                  <span className="text-sm font-bold text-zinc-100">Fotografía principal</span>
+                  <p className="text-[11px] text-zinc-600">Imagen de portada del producto</p>
+                </div>
               </div>
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleMediaChange(e, "product")}
-                className="block w-full text-sm text-black/60 file:mr-4 file:rounded-xl file:border-0 file:bg-black file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white file:shadow-sm hover:file:bg-siragon-orange transition-colors cursor-pointer"
+                className="block w-full cursor-pointer rounded-xl border border-dashed border-white/[0.06] bg-zinc-950/40 px-4 py-3 text-sm text-zinc-600 transition-colors file:mr-4 file:rounded-xl file:border-0 file:bg-orange-500/15 file:px-4 file:py-2 file:text-[11px] file:font-bold file:text-orange-400 hover:file:bg-orange-500 hover:file:text-white"
               />
               {productPhoto && (
-                <div className="mt-5 max-w-[220px] rounded-2xl border border-black/10 bg-white p-3 shadow-sm">
-                  <img
-                    src={productPhoto.previewUrl}
-                    alt={productPhoto.name}
-                    className="h-32 w-full rounded-xl object-cover"
-                  />
-                  <p className="mt-3 truncate text-xs font-medium text-black/80 px-1">{productPhoto.name}</p>
-                  <button
-                    type="button"
-                    onClick={removeProductPhoto}
-                    className="mt-2 w-full rounded-lg bg-red-50 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 hover:bg-red-100 transition-colors"
-                  >
-                    Eliminar
-                  </button>
+                <div className="mt-5 w-fit overflow-hidden rounded-xl border border-white/[0.07] bg-zinc-950/60">
+                  <img src={productPhoto.previewUrl} alt={productPhoto.name} className="h-40 w-56 object-cover" />
+                  <div className="p-3">
+                    <p className="mb-2 truncate text-[10px] font-medium text-zinc-600">{productPhoto.name}</p>
+                    <button
+                      type="button"
+                      onClick={removeProductPhoto}
+                      className="flex w-full items-center justify-center gap-1 rounded-lg bg-red-500/10 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-500/70 transition-all hover:bg-red-500 hover:text-white"
+                    >
+                      <X size={10} /> Eliminar foto
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-white shadow-sm p-6 transition-colors hover:border-black/20">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-black">
-                <div className="p-1.5 rounded-lg bg-black text-white">
-                  <Upload size={16} />
-                </div>
-                Guías de Instalación
-                <span className="text-xs font-normal text-black/40 ml-2">(Imágenes o Videos)</span>
-              </div>
-              <input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={(e) => handleMediaChange(e, "guide")}
-                className="block w-full text-sm text-black/60 file:mr-4 file:rounded-xl file:border-0 file:bg-black file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white file:shadow-sm hover:file:bg-siragon-orange transition-colors cursor-pointer"
-              />
-              {guideMedia.length > 0 && (
-                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {guideMedia.map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-black/10 bg-white p-3 shadow-sm flex flex-col">
-                      {item.type === "image" ? (
-                        <img src={item.previewUrl} alt={item.name} className="h-24 w-full rounded-xl object-cover" />
-                      ) : (
-                        <video src={item.previewUrl} className="h-24 w-full rounded-xl object-cover" controls />
-                      )}
-                      <p className="mt-3 mb-2 truncate text-xs font-medium text-black/80 px-1">{item.name}</p>
-                      <button
-                        type="button"
-                        onClick={() => removeMedia(item.id, "guide")}
-                        className="mt-auto w-full rounded-lg bg-red-50 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 hover:bg-red-100 transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-black/10 bg-white shadow-sm p-6 transition-colors hover:border-black/20">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-black">
-                <div className="p-1.5 rounded-lg bg-black text-white">
-                  <Upload size={16} />
-                </div>
-                Tips Adicionales
-                <span className="text-xs font-normal text-black/40 ml-2">(Imágenes o Videos)</span>
-              </div>
-              <input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={(e) => handleMediaChange(e, "tips")}
-                className="block w-full text-sm text-black/60 file:mr-4 file:rounded-xl file:border-0 file:bg-black file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white file:shadow-sm hover:file:bg-siragon-orange transition-colors cursor-pointer"
-              />
-              {tipsMedia.length > 0 && (
-                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {tipsMedia.map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-black/10 bg-white p-3 shadow-sm flex flex-col">
-                      {item.type === "image" ? (
-                        <img src={item.previewUrl} alt={item.name} className="h-24 w-full rounded-xl object-cover" />
-                      ) : (
-                        <video src={item.previewUrl} className="h-24 w-full rounded-xl object-cover" controls />
-                      )}
-                      <p className="mt-3 mb-2 truncate text-xs font-medium text-black/80 px-1">{item.name}</p>
-                      <button
-                        type="button"
-                        onClick={() => removeMedia(item.id, "tips")}
-                        className="mt-auto w-full rounded-lg bg-red-50 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 hover:bg-red-100 transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {mediaBlock(
+              "Guías de instalación",
+              "Imágenes o videos paso a paso",
+              "guide",
+              guideMedia,
+              "bg-gradient-to-br from-blue-500 to-blue-600"
+            )}
+            {mediaBlock(
+              "Tips adicionales",
+              "Consejos y recomendaciones del producto",
+              "tips",
+              tipsMedia,
+              "bg-gradient-to-br from-purple-500 to-purple-600"
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="mt-8 w-full rounded-2xl bg-black py-4 font-bold text-white shadow-[0_10px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-siragon-orange hover:shadow-[0_10px_20px_rgba(238,116,2,0.3)] disabled:opacity-60 disabled:hover:bg-black flex justify-center"
+              className="relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 py-4 px-6 text-sm font-bold text-white shadow-xl shadow-orange-500/25 transition-all duration-200 hover:from-orange-400 hover:to-orange-500 hover:shadow-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Guardando..." : "Publicar Equipo"}
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Guardando producto...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Publicar equipo
+                </>
+              )}
             </button>
           </form>
         </div>

@@ -3,20 +3,19 @@
 import { signIn } from "next-auth/react";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LockKeyhole, Mail } from "lucide-react";
-import Link from "next/link";
+import { LockKeyhole, Mail, AlertCircle, Shield } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-
-
+    setLoading(true);
 
     const res = await signIn("credentials", {
       email,
@@ -25,62 +24,62 @@ export default function Login() {
     });
 
     if (res?.error) {
-      setError("Credenciales inválidas");
+      setError("Credenciales inválidas. Verifica tu email y contraseña.");
+      setLoading(false);
     } else {
       router.push("/dashboard");
     }
   };
 
   return (
-    <main className="min-h-screen flex flex-col font-sans overflow-hidden bg-white text-black relative">
-      {/* Background Overlays */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-siragon-orange/10 via-transparent to-transparent opacity-80" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-black/5 via-transparent to-transparent" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 font-sans">
+      {/* Background */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_900px_700px_at_50%_-10%,rgba(249,115,22,0.13),transparent_65%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_600px_400px_at_80%_90%,rgba(249,115,22,0.06),transparent_70%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.018\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
+
+      {/* Logo top */}
+      <div className="absolute left-1/2 top-8 -translate-x-1/2">
+        <a href="https://siragon.com" target="_blank" rel="noopener noreferrer">
+          <img
+            src="https://siragon.com/wp-content/uploads/2023/03/Logo-Siragon_Blanco-e1684488951400.png"
+            alt="Síragon"
+            className="h-8 w-auto opacity-60 transition-opacity hover:opacity-100"
+          />
+        </a>
       </div>
 
-      <nav className="sticky top-0 z-50 bg-black border-b border-white/10 shadow-sm w-full">
-        <div className="flex items-center justify-between px-8 h-[45px] max-w-7xl mx-auto w-full">
-          {/* Síragon Official Links */}
-          <div className="flex items-center gap-8">
-            <a href="https://siragon.com">
-              <img src="https://siragon.com/wp-content/uploads/2023/03/Logo-Siragon_Blanco-e1684488951400.png" alt="Síragon" className="h-6 w-auto" />
-            </a>
-          </div>
+      {/* Card */}
+      <div className="relative w-full max-w-md px-6">
+        <div className="absolute -inset-px rounded-3xl bg-gradient-to-b from-orange-500/20 via-orange-500/5 to-transparent blur-xl" />
+        <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-zinc-900/80 p-10 shadow-2xl shadow-black/60 backdrop-blur-2xl">
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
 
-          <div className="flex items-center gap-4">          </div>
-        </div>
-      </nav>
-
-      <div className="flex-1 flex items-center justify-center px-6 relative z-10 w-full py-12">
-        <div className="relative bg-white p-10 md:p-14 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-full max-w-lg border border-black/10 group">
-          <div className="text-center mb-10">
-            <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-black text-white shadow-lg">
-              <LockKeyhole size={32} />
+          {/* Header */}
+          <div className="mb-10 text-center">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/30 bg-gradient-to-br from-orange-500/20 to-orange-600/10 shadow-lg shadow-orange-500/10">
+              <Shield size={26} className="text-orange-400" />
             </div>
-            <h2 className="text-3xl font-light tracking-tight text-black mb-2">
-              Iniciar <span className="font-bold text-siragon-orange">Sesión</span>
-            </h2>
           </div>
 
           {error && (
-            <div className="mb-8 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.08] p-4 text-sm text-red-400">
+              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
-                Correo Electrónico
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label className="ml-1 text-[11px] font-bold uppercase tracking-widest text-zinc-600">
+                Correo electrónico
               </label>
               <div className="relative flex items-center">
-                <Mail size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
+                <Mail size={16} className="absolute left-4 text-zinc-600" />
                 <input
                   type="email"
-                  className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
-                  placeholder="tu@email.com"
+                  className="w-full rounded-xl border border-white/[0.07] bg-zinc-950/60 py-4 pl-11 pr-5 text-sm font-medium text-zinc-100 outline-none transition-all placeholder:text-zinc-700 hover:border-white/15 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="admin@siragon.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -88,15 +87,15 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-black/60 uppercase tracking-wider ml-1">
+            <div className="space-y-2">
+              <label className="ml-1 text-[11px] font-bold uppercase tracking-widest text-zinc-600">
                 Contraseña
               </label>
               <div className="relative flex items-center">
-                <LockKeyhole size={18} className="absolute left-5 text-black/40 peer-focus:text-siragon-orange transition-colors" />
+                <LockKeyhole size={16} className="absolute left-4 text-zinc-600" />
                 <input
                   type="password"
-                  className="peer w-full px-5 py-4 pl-12 rounded-2xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-siragon-orange focus:border-transparent transition-all placeholder:text-black/30 font-medium text-black shadow-sm"
+                  className="w-full rounded-xl border border-white/[0.07] bg-zinc-950/60 py-4 pl-11 pr-5 text-sm font-medium text-zinc-100 outline-none transition-all placeholder:text-zinc-700 hover:border-white/15 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -107,11 +106,23 @@ export default function Login() {
 
             <button
               type="submit"
-              className="mt-4 w-full bg-black hover:bg-siragon-orange text-white font-bold py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_20px_rgba(238,116,2,0.3)] flex justify-center items-center gap-2 disabled:opacity-70"
+              disabled={loading}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 py-4 text-sm font-bold text-white shadow-xl shadow-orange-500/25 transition-all hover:from-orange-400 hover:to-orange-500 hover:shadow-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Ingresar al Panel
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Verificando...
+                </>
+              ) : (
+                "Ingresar al Panel"
+              )}
             </button>
           </form>
+
+          <p className="mt-8 text-center text-[11px] text-zinc-700">
+            Síragon Pague · Panel de administración interno
+          </p>
         </div>
       </div>
     </main>

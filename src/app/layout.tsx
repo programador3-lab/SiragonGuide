@@ -8,8 +8,8 @@ import { Headphones } from "lucide-react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Siragon - Guías de Productos",
-  description: "Centro de asistencia y ayuda de Siragon",
+  title: "Síragon - Guías de Productos",
+  description: "Centro de asistencia y ayuda de Síragon",
   icons: {
     icon: "https://siragon.com/wp-content/uploads/2022/03/FAVICON-S_Mesa-de-trabajo-1-hhhhhhhhhhde-trabajo-1-copia-12.png",
     shortcut: "https://siragon.com/wp-content/uploads/2022/03/FAVICON-S_Mesa-de-trabajo-1-hhhhhhhhhhde-trabajo-1-copia-12.png",
